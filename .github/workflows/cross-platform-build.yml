@@ -41,53 +41,41 @@ jobs:
       shell: bash
       run: echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
-    - name: Install dependencies (Linux & macOS)
-      if: runner.os != 'Windows'
+    - name: Install dependencies
+      shell: bash
       run: |
-        if [ $RUNNER_OS == "macOS" ]; then
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          echo "Installing MSYS2 and packages..."
+          curl -L -o msys2.exe https://repo.msys2.org/distrib/x86_64/msys2-x86_64-latest.exe
+          echo "Please use 'msys2/setup-msys2@v2' for proper MSYS2 installation instead."
+        elif [[ "$RUNNER_OS" == "macOS" ]]; then
           brew install cmake gcc
         else
-          sudo apt update && sudo apt install -y cmake g++
+          sudo apt update && sudo apt install -y cmake g++ clang
         fi
 
+
     - name: Install dependencies (Windows)
-      if: matrix.os == 'windows-latest' && matrix.c_compiler == 'cl'
+      if: runner.os == 'Windows'
       uses: msys2/setup-msys2@v2
       with:
         msystem: mingw64
-        install: mingw-w64-x86_64-cmake mingw-w64-x86_64-gcc
+        install: >-
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-clang
 
-    - name: Configure CMake project (Linux & macOS)
-      if: runner.os != 'Windows'
-      run: |
-        cmake -S . -B build
+    - name: Configure CMake
+      run: cmake -S . -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
 
-    - name: Configure CMake project (Windows)
-      if: matrix.os == 'windows-latest' && matrix.c_compiler == 'cl'
-      shell: msys2 {0}
-      run: |
-        cmake -S . -B build
+    - name: Build
+      run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
-    - name: Build C++ code (Linux & macOS)
-      if: runner.os != 'Windows'
+    - name: Run tests
       run: |
-        cmake --build build
-
-    - name: Build C++ code (Windows)
-      if: matrix.os == 'windows-latest' && matrix.c_compiler == 'cl'
-      shell: msys2 {0}
-      run: |
-        cmake --build build
-
-    - name: Run tests (Linux & macOS)
-      if: runner.os != 'Windows'
-      run: |
-        cd build
-        ./main
-
-    - name: Run tests (Windows)
-      if: matrix.os == 'windows-latest' && matrix.c_compiler == 'cl'
-      shell: msys2 {0}
-      run: |
-        cd build
-        ./main.exe
+        cd ${{ steps.strings.outputs.build-output-dir }}
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          ./main.exe
+        else
+          ./main
+        fi
