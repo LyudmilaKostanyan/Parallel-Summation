@@ -14,7 +14,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         build_type: [Release]
-        c_compiler: [gcc, cl, clang]
         include:
           - os: windows-latest
             c_compiler: cl
@@ -25,17 +24,6 @@ jobs:
           - os: macos-latest
             c_compiler: clang
             cpp_compiler: clang++
-        exclude:
-          - os: windows-latest
-            c_compiler: gcc
-          - os: windows-latest
-            c_compiler: clang
-          - os: ubuntu-latest
-            c_compiler: clang
-          - os: macos-latest
-            c_compiler: gcc
-          - os: macos-latest
-            c_compiler: cl
 
     steps:
     - uses: actions/checkout@v4
@@ -49,16 +37,15 @@ jobs:
       shell: bash
       run: |
         if [[ "$RUNNER_OS" == "Windows" ]]; then
-          echo "MSYS2 dependencies will be installed in the next step."
+          echo "Installing MSYS2..."
         elif [[ "$RUNNER_OS" == "macOS" ]]; then
           brew install cmake
         else
           sudo apt update && sudo apt install -y cmake g++
         fi
 
-    - name: Install MSYS2 for Windows
+    - uses: msys2/setup-msys2@v2
       if: runner.os == 'Windows'
-      uses: msys2/setup-msys2@v2
       with:
         msystem: mingw64
         install: >-
@@ -67,15 +54,18 @@ jobs:
           mingw-w64-x86_64-clang
 
     - name: Configure CMake
+      shell: bash
       run: cmake -S . -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
 
     - name: Build
+      shell: bash
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
     - name: Run tests
+      shell: bash
       run: |
         cd ${{ steps.strings.outputs.build-output-dir }}
-        if [ "$RUNNER_OS" = "Windows" ]; then
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
           ./main.exe
         else
           ./main
