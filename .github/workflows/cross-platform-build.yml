@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         build_type: [Release]
         c_compiler: [gcc, clang, cl]
         include:
@@ -25,12 +25,19 @@ jobs:
           - os: ubuntu-latest
             c_compiler: clang
             cpp_compiler: clang++
+          - os: macos-latest
+            c_compiler: clang
+            cpp_compiler: clang++
         exclude:
           - os: windows-latest
             c_compiler: gcc
           - os: windows-latest
             c_compiler: clang
           - os: ubuntu-latest
+            c_compiler: cl
+          - os: macos-latest
+            c_compiler: gcc
+          - os: macos-latest
             c_compiler: cl
 
     steps:
@@ -45,17 +52,16 @@ jobs:
       shell: bash
       run: |
         if [[ "$RUNNER_OS" == "Windows" ]]; then
-          echo "Installing MSYS2 and packages..."
-          curl -L -o msys2.exe https://repo.msys2.org/distrib/x86_64/msys2-x86_64-latest.exe
-          echo "Please use 'msys2/setup-msys2@v2' for proper MSYS2 installation instead."
+          echo "Installing MSYS2..."
+          pacman -Sy --noconfirm
+          echo "Note: Dependencies installed by 'msys2/setup-msys2' action"
         elif [[ "$RUNNER_OS" == "macOS" ]]; then
-          brew install cmake gcc
+          brew install cmake
         else
           sudo apt update && sudo apt install -y cmake g++ clang
         fi
 
-
-    - name: Install dependencies (Windows)
+    - name: Install MSYS2 for Windows
       if: runner.os == 'Windows'
       uses: msys2/setup-msys2@v2
       with:
