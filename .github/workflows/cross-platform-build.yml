@@ -33,19 +33,18 @@ jobs:
       shell: bash
       run: echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
-    - name: Install dependencies
+    - name: Install dependencies (Linux/macOS)
+      if: matrix.os != 'windows-latest'
       shell: bash
       run: |
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          echo "MSYS2 dependencies will be installed in the next step."
-        elif [[ "$RUNNER_OS" == "macOS" ]]; then
+        if [[ "$RUNNER_OS" == "macOS" ]]; then
           brew install cmake
         else
           sudo apt update && sudo apt install -y cmake g++
         fi
 
     - name: Install MSYS2 packages (Windows only)
-      if: runner.os == 'Windows'
+      if: matrix.os == 'windows-latest'
       shell: msys2 {0}
       run: |
         pacman -Syu --noconfirm
@@ -54,15 +53,29 @@ jobs:
           mingw-w64-x86_64-gcc \
           mingw-w64-x86_64-clang
 
-    - name: Configure CMake
+    - name: Configure CMake (Windows + cl)
+      if: matrix.os == 'windows-latest' && matrix.c_compiler == 'cl'
+      shell: cmd
+      run: |
+        cmake -S . -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
+    - name: Configure CMake (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      shell: bash
       run: |
         cmake -S . -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-      shell: ${{ runner.os == 'Windows' && matrix.c_compiler == 'cl' && 'cmd' || 'bash' }}
 
-    - name: Build
+    - name: Build (Windows + cl)
+      if: matrix.os == 'windows-latest' && matrix.c_compiler == 'cl'
+      shell: cmd
       run: |
         cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
-      shell: ${{ runner.os == 'Windows' && matrix.c_compiler == 'cl' && 'cmd' || 'bash' }}
+
+    - name: Build (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      shell: bash
+      run: |
+        cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
     - name: Run tests
       shell: bash
