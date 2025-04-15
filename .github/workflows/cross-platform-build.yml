@@ -43,21 +43,11 @@ jobs:
           sudo apt update && sudo apt install -y cmake g++
         fi
 
-    - name: Install MSYS2 packages (Windows only)
-      if: matrix.os == 'windows-latest'
-      shell: msys2 {0}
-      run: |
-        pacman -Syu --noconfirm
-        pacman -S --noconfirm \
-          mingw-w64-x86_64-cmake \
-          mingw-w64-x86_64-gcc \
-          mingw-w64-x86_64-clang
-
     - name: Configure CMake (Windows + cl)
-      if: matrix.os == 'windows-latest' && matrix.c_compiler == 'cl'
+      if: matrix.os == 'windows-latest'
       shell: cmd
       run: |
-        cmake -S . -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        cmake -S . -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
 
     - name: Configure CMake (Linux/macOS)
       if: matrix.os != 'windows-latest'
@@ -65,17 +55,10 @@ jobs:
       run: |
         cmake -S . -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
 
-    - name: Build (Windows + cl)
-      if: matrix.os == 'windows-latest' && matrix.c_compiler == 'cl'
-      shell: cmd
+    - name: Build
       run: |
         cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
-
-    - name: Build (Linux/macOS)
-      if: matrix.os != 'windows-latest'
       shell: bash
-      run: |
-        cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
     - name: Run tests
       shell: bash
