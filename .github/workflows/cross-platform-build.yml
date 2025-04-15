@@ -33,16 +33,6 @@ jobs:
       shell: bash
       run: echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
-    - name: Install dependencies (Linux/macOS)
-      if: matrix.os != 'windows-latest'
-      shell: bash
-      run: |
-        if [[ "$RUNNER_OS" == "macOS" ]]; then
-          brew install cmake
-        else
-          sudo apt update && sudo apt install -y cmake g++
-        fi
-
     - name: Configure CMake
       shell: bash
       run: |
@@ -65,9 +55,11 @@ jobs:
       shell: bash
       run: |
         if [[ "$RUNNER_OS" == "Windows" ]]; then
-          cd "$(cygpath -u "${{ steps.strings.outputs.build-output-dir }}")"
-          ./main.exe
+          exe_path="$(cygpath -u "${{ steps.strings.outputs.build-output-dir }}")/Release/main.exe"
+          echo "Running: $exe_path"
+          "$exe_path"
         else
           cd ${{ steps.strings.outputs.build-output-dir }}
           ./main
         fi
+      
