@@ -15,15 +15,23 @@ double measure_time(Func&& func) {
     return timer.duration<zen::timer::usec>().count() / 1000.0;
 }
 
-void atomic_sum(const std::vector<int>& data, std::atomic<long long>& total, std::memory_order order, unsigned int numThreads) {
+void print_result(const std::string& method, const std::string& memoryOrder,
+                  long long sum, double timeMs) {
+    std::cout << std::setw(20) << method
+              << std::setw(20) << memoryOrder
+              << std::setw(20) << sum
+              << std::fixed << std::setprecision(2) << std::setw(20) << timeMs << "\n";
+}
+
+void atomic_sum(const std::vector<int>& data, std::atomic<long long>& total,
+                std::memory_order order, unsigned int numThreads) {
     std::vector<std::thread> threads;
     size_t chunk = data.size() / numThreads;
 
     auto worker = [&data, &total, order](size_t start, size_t end) {
         long long localSum = 0;
-        for (size_t i = start; i < end; ++i) {
+        for (size_t i = start; i < end; ++i)
             localSum += data[i];
-        }
         total.fetch_add(localSum, order);
     };
 
@@ -33,19 +41,18 @@ void atomic_sum(const std::vector<int>& data, std::atomic<long long>& total, std
         threads.emplace_back(worker, start, end);
     }
 
-    for (auto& t : threads) {
+    for (auto& t : threads)
         t.join();
-    }
 }
 
-void reduce_sum(const std::vector<int>& data, std::vector<long long>& partialSums, unsigned int numThreads) {
+void reduce_sum(const std::vector<int>& data, std::vector<long long>& partialSums,
+                unsigned int numThreads) {
     std::vector<std::thread> threads;
     size_t chunk = data.size() / numThreads;
 
     auto worker = [&data, &partialSums](unsigned int tid, size_t start, size_t end) {
-        for (size_t i = start; i < end; ++i) {
+        for (size_t i = start; i < end; ++i)
             partialSums[tid] += data[i];
-        }
     };
 
     for (unsigned int i = 0; i < numThreads; ++i) {
@@ -54,9 +61,8 @@ void reduce_sum(const std::vector<int>& data, std::vector<long long>& partialSum
         threads.emplace_back(worker, i, start, end);
     }
 
-    for (auto& t : threads) {
+    for (auto& t : threads)
         t.join();
-    }
 }
 
 void single_thread_sum(const std::vector<int>& data, long long& result) {
@@ -65,8 +71,15 @@ void single_thread_sum(const std::vector<int>& data, long long& result) {
         result += value;
 }
 
-int main() {
-    const size_t dataSize = 1000000;
+int main(int argc, char** argv) {
+    zen::cmd_args args(argv, argc);
+    size_t dataSize = 100000000;
+    if (args.is_present("--n")) {
+        auto n = std::stoi(args.get_options("--n")[0]);
+        if (n > 0)
+            dataSize = n;
+    }
+
     std::vector<int> data(dataSize);
     std::iota(data.begin(), data.end(), 1);
 
@@ -77,7 +90,6 @@ int main() {
               << std::setw(20) << "Memory Order"
               << std::setw(20) << "Sum"
               << std::setw(20) << "Time (ms)" << "\n";
-
     std::cout << std::string(80, '-') << "\n";
 
     for (auto order : {std::memory_order_relaxed, std::memory_order_seq_cst}) {
@@ -85,10 +97,10 @@ int main() {
         double time = measure_time([&]() {
             atomic_sum(data, total, order, numThreads);
         });
-        std::cout << std::setw(20) << "Atomic Sum"
-                  << std::setw(20) << (order == std::memory_order_relaxed ? "relaxed" : "seq_cst")
-                  << std::setw(20) << total.load()
-                  << std::fixed << std::setprecision(2) << std::setw(20) << time << "\n";
+        print_result("Atomic Sum",
+                     order == std::memory_order_relaxed ? "relaxed" : "seq_cst",
+                     total.load(),
+                     time);
     }
 
     std::vector<long long> partialSums(numThreads, 0);
@@ -100,19 +112,13 @@ int main() {
     for (auto sum : partialSums) {
         reduceResult += sum;
     }
-    std::cout << std::setw(20) << "Reduce Sum"
-              << std::setw(20) << "N/A"
-              << std::setw(20) << reduceResult
-              << std::fixed << std::setprecision(2) << std::setw(20) << reduce_time << "\n";
+    print_result("Reduce Sum", "N/A", reduceResult, reduce_time);
 
     long long singleThreadResult = 0;
     double single_thread_time = measure_time([&]() {
         single_thread_sum(data, singleThreadResult);
     });
-    std::cout << std::setw(20) << "Single-Threaded"
-              << std::setw(20) << "N/A"
-              << std::setw(20) << singleThreadResult
-              << std::fixed << std::setprecision(2) << std::setw(20) << single_thread_time << "\n";
+    print_result("Single-Threaded", "N/A", singleThreadResult, single_thread_time);
 
     return 0;
 }
