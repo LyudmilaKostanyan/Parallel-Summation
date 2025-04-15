@@ -37,29 +37,32 @@ jobs:
       shell: bash
       run: |
         if [[ "$RUNNER_OS" == "Windows" ]]; then
-          echo "Installing MSYS2..."
+          echo "MSYS2 dependencies will be installed in the next step."
         elif [[ "$RUNNER_OS" == "macOS" ]]; then
           brew install cmake
         else
           sudo apt update && sudo apt install -y cmake g++
         fi
 
-    - uses: msys2/setup-msys2@v2
+    - name: Install MSYS2 packages (Windows only)
       if: runner.os == 'Windows'
-      with:
-        msystem: mingw64
-        install: >-
-          mingw-w64-x86_64-cmake
-          mingw-w64-x86_64-gcc
+      shell: msys2 {0}
+      run: |
+        pacman -Syu --noconfirm
+        pacman -S --noconfirm \
+          mingw-w64-x86_64-cmake \
+          mingw-w64-x86_64-gcc \
           mingw-w64-x86_64-clang
 
     - name: Configure CMake
-      shell: bash
-      run: cmake -S . -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+      run: |
+        cmake -S . -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+      shell: ${{ runner.os == 'Windows' && matrix.c_compiler == 'cl' && 'cmd' || 'bash' }}
 
     - name: Build
-      shell: bash
-      run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+      run: |
+        cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+      shell: ${{ runner.os == 'Windows' && matrix.c_compiler == 'cl' && 'cmd' || 'bash' }}
 
     - name: Run tests
       shell: bash
