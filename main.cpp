@@ -86,6 +86,7 @@ int main(int argc, char** argv) {
     unsigned int numThreads = std::thread::hardware_concurrency();
     if (numThreads == 0) numThreads = 2;
 
+    std::cout << "Thread Count: " << numThreads << "\n";
     std::cout << "Iterations: " << dataSize << "\n\n";
     std::cout << std::left << std::setw(20) << "Method"
               << std::setw(20) << "Memory Order"
