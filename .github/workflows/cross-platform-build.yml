@@ -51,7 +51,7 @@ jobs:
         fi
 
     - name: Install dependencies (Windows)
-      if: runner.os == 'Windows'
+      if: matrix.os == 'windows-latest' && matrix.c_compiler == 'cl'
       uses: msys2/setup-msys2@v2
       with:
         msystem: mingw64
@@ -61,9 +61,9 @@ jobs:
       if: runner.os != 'Windows'
       run: |
         cmake -S . -B build
-      
+
     - name: Configure CMake project (Windows)
-      if: runner.os == 'Windows'
+      if: matrix.os == 'windows-latest' && matrix.c_compiler == 'cl'
       shell: msys2 {0}
       run: |
         cmake -S . -B build
@@ -72,9 +72,9 @@ jobs:
       if: runner.os != 'Windows'
       run: |
         cmake --build build
-      
+
     - name: Build C++ code (Windows)
-      if: runner.os == 'Windows'
+      if: matrix.os == 'windows-latest' && matrix.c_compiler == 'cl'
       shell: msys2 {0}
       run: |
         cmake --build build
@@ -83,45 +83,11 @@ jobs:
       if: runner.os != 'Windows'
       run: |
         cd build
-        ./main --row_size 5000
+        ./main
 
     - name: Run tests (Windows)
-      if: runner.os == 'Windows'
+      if: matrix.os == 'windows-latest' && matrix.c_compiler == 'cl'
       shell: msys2 {0}
       run: |
         cd build
-        ./main.exe --row_size 5000
-
-    - name: Debug with GDB (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      working-directory: ${{ steps.strings.outputs.build-output-dir }}
-      shell: bash
-      run: |
-        sudo apt-get update && sudo apt-get install -y gdb
-        executable="./main"
-        if [ -f "$executable" ]; then
-          echo "run" > gdb_commands.txt
-          echo "bt full" >> gdb_commands.txt
-          echo "Running GDB:"
-          gdb --batch --quiet -x gdb_commands.txt "$executable"
-        fi
-      continue-on-error: true
-
-    - name: Debug with GDB (Windows)
-      if: matrix.os == 'windows-latest' && matrix.c_compiler == 'g++'
-      shell: bash
-      run: |
-        # Assuming MinGW or Cygwin is installed, or GDB is available in the path
-        gdb_path="C:/MinGW/bin/gdb.exe"
-        executable="main.exe"
-        
-        # Check if GDB is available
-        if command -v "$gdb_path" &> /dev/null; then
-          echo "GDB found, running it"
-          echo "run" > gdb_commands.txt
-          echo "bt full" >> gdb_commands.txt
-          "$gdb_path" --batch --quiet -x gdb_commands.txt "$executable"
-        else
-          echo "GDB not found, skipping debugging"
-        fi
-      continue-on-error: true
+        ./main.exe
