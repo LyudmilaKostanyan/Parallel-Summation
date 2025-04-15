@@ -17,23 +17,12 @@ Summing large arrays efficiently is a common problem in parallel computing. The 
 3. **Single-Threaded Sum:**  
    A baseline method that performs the summation sequentially without multithreading, offering a point of comparison for performance metrics.
 
-## Explanation of Some Topics
-### Parallel Summation
-The core idea behind parallel summation is to divide the dataset among multiple threads so that each thread handles a portion of the data. This partitioning aims to reduce overall processing time by leveraging concurrent execution. The final result can be computed:
-- **With Locks (Atomic Sum):** Threads update a shared atomic variable, ensuring data integrity with locking mechanisms implicit in atomic operations.
-- **Without Locks (Reduce Sum):** Threads compute their sums independently, and a final aggregation step combines these results. This method reduces locking overhead but introduces additional steps in the reduction phase.
-
-### Memory Ordering in Atomics
-- **`std::memory_order_relaxed`:**  
-  This ordering does not enforce any constraints on the sequence of operations across threads, making it faster but with less strict ordering.
-  
-- **`std::memory_order_seq_cst`:**  
-  This ordering enforces a sequentially consistent view of operations, ensuring that all threads see operations in the same order at the cost of performance due to the heavier synchronization requirements.
-
 ## Example Output
 An example run of the program may produce output similar to the following:
 
 ```
+Iterations: 100000000
+
 Method              Memory Order        Sum                 Time (ms)           
 --------------------------------------------------------------------------------
 Atomic Sum          relaxed             5000000050000000    134.20              
