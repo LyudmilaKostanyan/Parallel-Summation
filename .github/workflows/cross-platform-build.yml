@@ -43,29 +43,31 @@ jobs:
           sudo apt update && sudo apt install -y cmake g++
         fi
 
-    - name: Configure CMake (Windows + cl)
-      if: matrix.os == 'windows-latest'
-      shell: cmd
-      run: |
-        cmake -S . -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-
-    - name: Configure CMake (Linux/macOS)
-      if: matrix.os != 'windows-latest'
+    - name: Configure CMake
       shell: bash
       run: |
-        cmake -S . -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          cmake -S . -B "$(cygpath -u "${{ steps.strings.outputs.build-output-dir }}")" -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        else
+          cmake -S . -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        fi
 
     - name: Build
-      run: |
-        cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
       shell: bash
+      run: |
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          cmake --build "$(cygpath -u "${{ steps.strings.outputs.build-output-dir }}")" --config ${{ matrix.build_type }}
+        else
+          cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+        fi
 
     - name: Run tests
       shell: bash
       run: |
-        cd ${{ steps.strings.outputs.build-output-dir }}
         if [[ "$RUNNER_OS" == "Windows" ]]; then
+          cd "$(cygpath -u "${{ steps.strings.outputs.build-output-dir }}")"
           ./main.exe
         else
+          cd ${{ steps.strings.outputs.build-output-dir }}
           ./main
         fi
