@@ -1,39 +1,37 @@
-# Memory Orders Benchmark
+# Parallel Summation Benchmark
 
 ## Overview
-This project is a C++ benchmarking tool designed to evaluate and compare different approaches to summing a large sequence of integers. It leverages multithreading to perform fast computations while testing how different memory ordering constraints impact performance and correctness in atomic operations.
+This C++ project demonstrates parallel summation techniques by partitioning an array among multiple threads. It compares different methods for aggregating the results—using atomic operations with various memory orderings and a reduction-based approach—to explore trade-offs in correctness, complexity, and speed.
 
 ## Problem Description
-Summing a sequence of numbers efficiently is a common operation in many applications. This project implements three distinct methods to compute the sum:
+Summing large arrays efficiently is a common problem in parallel computing. The challenge lies in managing shared data access and synchronization across multiple threads. This project implements three methods for calculating the sum of a large integer array:
 
-- **Atomic Sum:**  
-  Uses atomic operations with two different memory orders (`relaxed` and `seq_cst`) to safely update a shared total across multiple threads.
+1. **Atomic Sum:**  
+   Threads update a shared atomic variable using the `fetch_add` operation with different memory orderings:
+   - **Relaxed:** Provides minimal synchronization, offering higher performance but less ordering guarantees.
+   - **Sequentially Consistent (seq_cst):** Ensures a strict global order of operations, enhancing correctness at the cost of additional overhead.
 
-- **Reduce Sum:**  
-  Distributes the data among multiple threads where each thread computes its own partial sum. The partial sums are later aggregated into a final result.
+2. **Reduce Sum:**  
+   The array is partitioned among several threads. Each thread computes a partial sum independently, and these partial sums are then aggregated in the main thread. This approach avoids locks during computation but requires additional aggregation.
 
-- **Single-Threaded Sum:**  
-  Computes the sum sequentially using a single thread, serving as a baseline to compare the performance gains of multithreading.
-
-The goal is to analyze the trade-offs between these approaches, particularly focusing on the performance impacts caused by different atomic memory orderings and the overhead of synchronization.
+3. **Single-Threaded Sum:**  
+   A baseline method that performs the summation sequentially without multithreading, offering a point of comparison for performance metrics.
 
 ## Explanation of Some Topics
+### Parallel Summation
+The core idea behind parallel summation is to divide the dataset among multiple threads so that each thread handles a portion of the data. This partitioning aims to reduce overall processing time by leveraging concurrent execution. The final result can be computed:
+- **With Locks (Atomic Sum):** Threads update a shared atomic variable, ensuring data integrity with locking mechanisms implicit in atomic operations.
+- **Without Locks (Reduce Sum):** Threads compute their sums independently, and a final aggregation step combines these results. This method reduces locking overhead but introduces additional steps in the reduction phase.
 
-### Memory Ordering
+### Memory Ordering in Atomics
 - **`std::memory_order_relaxed`:**  
-  This mode imposes minimal ordering constraints, providing faster updates but with minimal synchronization guarantees.
+  This ordering does not enforce any constraints on the sequence of operations across threads, making it faster but with less strict ordering.
   
 - **`std::memory_order_seq_cst`:**  
-  Provides a strict global ordering of operations across threads, ensuring a consistent view at the cost of some performance overhead.
-
-### Multithreading and Work Distribution
-The program uses the C++ Standard Library's threading facilities (`std::thread`) to divide a large dataset into chunks. Each thread computes a partial sum for its assigned section. In the Atomic Sum approach, these partial sums are added to a shared atomic variable. In the Reduce Sum approach, the final summation is performed by aggregating locally computed partial sums.
-
-### Performance Measurement
-A timing utility from the `zen::timer` library is employed to record the execution time for each summing method. This measured time (in milliseconds) allows users to compare how different techniques perform under the same conditions and dataset sizes.
+  This ordering enforces a sequentially consistent view of operations, ensuring that all threads see operations in the same order at the cost of performance due to the heavier synchronization requirements.
 
 ## Example Output
-Below is an example of the output produced by the application:
+An example run of the program may produce output similar to the following:
 
 ```
 Method              Memory Order        Sum                 Time (ms)           
@@ -46,39 +44,39 @@ Single-Threaded     N/A                 5000000050000000    720.12
 
 ## Explanation of Output
 - **Method:**  
-  Specifies which summation approach was used:
-  - **Atomic Sum:** Uses atomic operations with the specified memory order.
-  - **Reduce Sum:** Computes local partial sums in each thread, then aggregates them.
-  - **Single-Threaded:** Computes the sum without any parallelization.
+  The column indicates the approach used:
+  - **Atomic Sum:** Aggregates results using atomic operations with the specified memory order.
+  - **Reduce Sum:** Accumulates partial sums computed by multiple threads.
+  - **Single-Threaded:** Uses a sequential method, serving as the performance baseline.
 
 - **Memory Order:**  
-  Indicates the memory ordering used for atomic operations. For non-atomic methods, it displays `N/A`.
+  Displays the memory ordering for atomic operations. For non-atomic methods such as Reduce Sum and Single-Threaded Sum, this field is marked as `N/A`.
 
 - **Sum:**  
-  The computed total sum, which is the result of summing numbers from 1 to _n_. The shown sum (5000000050000000) corresponds to the formula *n(n + 1)/2* when _n_ is 100,000,000 (the default dataset size).
+  The computed total from summing the integers. In this case, the sum `5000000050000000` represents the mathematical result of summing numbers from 1 to _n_, with _n_ being the number of elements processed.
 
 - **Time (ms):**  
-  The execution time in milliseconds for each summation method. Lower times indicate faster performance. The results highlight that while atomic operations can be efficient with relaxed ordering, reducing the workload using local partial sums may incur additional overhead in the aggregation phase.
+  The execution time in milliseconds for each method. Lower times indicate higher performance efficiency. The variations in timing highlight the impact of synchronization overhead and parallel computation strategies.
 
 ## How to Compile and Run
 
 ### 1. Clone the Repository
-Clone the repository from GitHub with the following commands:
+Clone the repository from GitHub using the following commands:
 
 ```bash
-git clone https://github.com/username/Parallel-Summation.git
+git clone https://github.com/username/Memory-Orders.git
+cd Memory-Orders
+```
+
+Alternatively, if you are working from a repository that provides runtime parameters:
+
+```bash
+git clone https://github.com/LyudmilaKostanyan/Parallel-Summation.git
 cd Parallel-Summation
 ```
 
-Alternatively, if you are working with a repository that accepts runtime parameters:
-
-```bash
-git clone https://github.com/LyudmilaKostanyan/Instruction-Reordering-Visualization.git
-cd Instruction-Reordering-Visualization
-```
-
 ### 2. Build the Project
-Use CMake to configure and build the project. Ensure you have CMake and a C++ compiler (e.g., g++) installed:
+Use CMake to configure and build the project. Ensure that you have CMake and a C++ compiler (e.g., g++) installed:
 
 ```bash
 cmake -S . -B build
@@ -88,25 +86,25 @@ cmake --build build
 ### 3. Run the Program
 
 #### For Windows Users
-If you want to run the program with a custom dataset size, use the `--n` parameter. For example:
-
+For Windows, the executable is named `main.exe`. You can run it with an optional command-line parameter to specify the number of elements:
+  
 Example with arguments:
 ```bash
 ./build/main.exe --n 5000000
 ```
-Example without arguments (uses the default dataset size of 100,000,000 elements):
+Example without arguments (default dataset size is used, e.g., 100,000,000 elements):
 ```bash
 ./build/main.exe
 ```
 
 #### For Linux/macOS Users
-For Linux or macOS, the executable is named `main`. Run it as follows:
-
+For Linux/macOS, the executable is named `main`. Run it as follows:
+  
 Example with arguments:
 ```bash
 ./build/main --n 5000000
 ```
-Or without arguments:
+Example without arguments:
 ```bash
 ./build/main
 ```
@@ -114,4 +112,4 @@ Or without arguments:
 ## Parameters
 
 - **--n:**  
-  This command-line parameter allows you to specify the number of elements in the dataset. When omitted, the program defaults to processing 100,000,000 elements. Adjust this parameter based on the desired workload for performance testing.
+  This command-line parameter allows you to specify the number of elements in the dataset. If this parameter is not provided, the program defaults to processing 100,000,000 elements. Adjust this parameter to test the performance of the summation methods with different data sizes.
