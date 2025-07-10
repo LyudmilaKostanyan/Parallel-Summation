@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <stdexcept>
 #include "kaizen.h"
+#include <future>
 
 template<typename Func>
 double measure_time(Func&& func) {
@@ -202,6 +203,22 @@ void threadpool_sum(const std::vector<int>& data, std::atomic<long long>& total,
     });
 }
 
+// Task-based sum using std::async
+long long async_sum(const std::vector<int>& data, size_t start, size_t end, unsigned int min_per_task = 100000) {
+    size_t length = end - start;
+    if (length <= min_per_task) {
+        long long sum = 0;
+        for (size_t i = start; i < end; ++i)
+            sum += data[i];
+        return sum;
+    } else {
+        size_t mid = start + length / 2;
+        auto left = std::async(std::launch::async, async_sum, std::cref(data), start, mid, min_per_task);
+        long long right_sum = async_sum(data, mid, end, min_per_task);
+        return left.get() + right_sum;
+    }
+}
+
 void benchmark_thread_scaling(const std::vector<int>& data) {
     std::cout << "\n=== Thread Scaling Analysis ===\n";
     std::cout << std::left << std::setw(10) << "Threads"
@@ -257,8 +274,10 @@ void benchmark_workload_scaling() {
     std::cout << std::left << std::setw(15) << "Data Size"
               << std::setw(15) << "Threads (ms)"
               << std::setw(18) << "ThreadPool (ms)"
-              << std::setw(15) << "Speedup Ratio" << "\n";
-    std::cout << zen::repeat("-", 65) << "\n";
+              << std::setw(18) << "Async (ms)"
+              << std::setw(18) << "Speedup T/TP"
+              << std::setw(18) << "Speedup T/Async" << "\n";
+    std::cout << zen::repeat("-", 100) << "\n";
 
     unsigned int numThreads = std::thread::hardware_concurrency();
     if (numThreads == 0)
@@ -282,13 +301,22 @@ void benchmark_workload_scaling() {
             threadpool_sum(testData, poolTotal, numThreads);
         });
 
-        double speedupRatio = threadsTime / poolTime;
+        // Async
+        long long asyncTotal = 0;
+        double asyncTime = measure_time([&]() {
+            asyncTotal = async_sum(testData, 0, testData.size());
+        });
+
+        double speedupTP = threadsTime / poolTime;
+        double speedupAsync = threadsTime / asyncTime;
 
         std::cout << std::setw(15) << dataSize
                   << std::fixed << std::setprecision(2)
                   << std::setw(15) << threadsTime
                   << std::setw(18) << poolTime
-                  << std::setw(15) << speedupRatio << "\n";
+                  << std::setw(18) << asyncTime
+                  << std::setw(18) << speedupTP
+                  << std::setw(18) << speedupAsync << "\n";
     }
 }
 
@@ -351,6 +379,13 @@ int main(int argc, char** argv) {
         single_thread_sum(data, singleThreadResult);
     });
     print_result("Single-Threaded", "N/A", singleThreadResult, single_thread_time);
+
+    // Async benchmark
+    long long asyncResult = 0;
+    double async_time = measure_time([&]() {
+        asyncResult = async_sum(data, 0, data.size());
+    });
+    print_result("Async Sum", "N/A", asyncResult, async_time);
 
     // Advanced benchmarks
     benchmark_thread_scaling(data);

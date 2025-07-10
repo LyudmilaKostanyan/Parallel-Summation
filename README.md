@@ -1,7 +1,7 @@
 # Parallel Summation Benchmark
 
 ## Overview
-This C++ project demonstrates parallel summation techniques by partitioning an array among multiple threads. It compares different methods for aggregating the results—using atomic operations with various memory orderings, a reduction-based approach, and a thread pool implementation—to explore trade-offs in correctness, complexity, and speed. The project includes comprehensive performance analysis across different thread counts and workload sizes.
+This C++ project demonstrates and benchmarks several parallel summation techniques by partitioning an array among multiple threads or tasks. It compares different methods for aggregating the results—using atomic operations with various memory orderings, a reduction-based approach, a thread pool implementation, and a task-based approach with `std::async`—to explore trade-offs in correctness, complexity, and speed. The project includes comprehensive performance analysis across different thread counts and workload sizes, and provides a detailed comparison of all methods, including asynchronous task-based summation.
 
 ## Problem Description
 Summing large arrays efficiently is a common problem in parallel computing. The challenge lies in managing shared data access and synchronization across multiple threads. This project implements four methods for calculating the sum of a large integer array:
@@ -20,6 +20,9 @@ Summing large arrays efficiently is a common problem in parallel computing. The 
 4. **Single-Threaded Sum:**  
    A baseline method that performs the summation sequentially without multithreading, offering a point of comparison for performance metrics.
 
+5. **Async Sum (std::async):**  
+   Utilizes C++11's `std::async` to run tasks asynchronously. This method automatically manages threads and allows for easy integration of parallelism in a divide-and-conquer style.
+
 ## Example Output
 An example run of the program may produce output similar to the following:
 
@@ -29,28 +32,29 @@ Thread Count: 8
 === Basic Performance Comparison ===
 Method              Memory Order        Sum                 Time (ms)
 --------------------------------------------------------------------------------
-Atomic Sum          relaxed             5000000050000000    115.86
-Atomic Sum          seq_cst             5000000050000000    138.69
-Reduce Sum          N/A                 5000000050000000    910.52
-ThreadPool Sum      N/A                 5000000050000000    122.01
-Single-Threaded     N/A                 5000000050000000    744.05
+Atomic Sum          relaxed             5000000050000000    101.90
+Atomic Sum          seq_cst             5000000050000000    95.61
+Reduce Sum          N/A                 5000000050000000    701.11
+ThreadPool Sum      N/A                 5000000050000000    102.51
+Single-Threaded     N/A                 5000000050000000    676.95
+Async Sum           N/A                 5000000050000000    229.80
 
 === Thread Scaling Analysis ===
 Threads   Atomic Sum (ms)     Reduce Sum (ms)     ThreadPool Sum (ms)   Thread Overhead (ms)
 ----------------------------------------------------------------------------------------------        
-1         303.72              460.48              302.13                382.09
-2         186.18              703.09              191.48                444.63
-4         130.94              824.91              125.41                477.92
-8         155.79              1411.83             142.36                783.80
+1         284.77              394.00              260.02                339.38
+2         147.06              648.85              144.66                397.95
+4         119.55              706.12              105.75                412.83
+8         116.97              645.21              116.42                381.08
 
 === Workload Scaling Analysis ===
-Data Size      Threads (ms)   ThreadPool (ms)   Speedup Ratio
------------------------------------------------------------------
-1000000        7.76           6.28              1.24
-5000000        12.70          12.63             1.01
-10000000       23.55          23.89             0.99
-50000000       73.90          63.48             1.16
-100000000      121.81         130.37            0.93
+Data Size      Threads (ms)   ThreadPool (ms)   Async (ms)        Speedup T/TP      Speedup T/Async   
+----------------------------------------------------------------------------------------------------  
+1000000        3.51           3.86              5.52              0.91              0.64
+5000000        10.99          9.52              9.78              1.15              1.12
+10000000       10.28          12.22             20.47             0.84              0.50
+50000000       48.62          50.25             101.55            0.97              0.48
+100000000      99.85          105.63            350.47            0.95              0.28
 ```
 
 ## Explanation of Output
@@ -62,9 +66,10 @@ Data Size      Threads (ms)   ThreadPool (ms)   Speedup Ratio
   - **Reduce Sum:** Accumulates partial sums computed by multiple threads.
   - **ThreadPool Sum:** Uses a pre-created thread pool to process summation tasks.
   - **Single-Threaded:** Uses a sequential method, serving as the performance baseline.
+  - **Async Sum:** Uses asynchronous tasks to perform the summation.
 
 - **Memory Order:**  
-  Displays the memory ordering for atomic operations. For non-atomic methods such as Reduce Sum, ThreadPool Sum, and Single-Threaded Sum, this field is marked as `N/A`.
+  Displays the memory ordering for atomic operations. For non-atomic methods such as Reduce Sum, ThreadPool Sum, Single-Threaded Sum, and Async Sum, this field is marked as `N/A`.
 
 - **Sum:**  
   The computed total from summing the integers. In this case, the sum `5000000050000000` represents the mathematical result of summing numbers from 1 to _n_, with _n_ being the number of elements processed.
@@ -93,13 +98,73 @@ This section compares thread pool vs. regular threads across different data size
 - **Data Size:** Number of elements in the array
 - **Threads (ms):** Time using regular thread creation/destruction
 - **ThreadPool (ms):** Time using pre-created thread pool
-- **Speedup Ratio:** Performance ratio (Threads time / ThreadPool time)
+- **Async (ms):** Time using `std::async` for asynchronous summation
+- **Speedup T/TP:** Performance ratio (Threads time / ThreadPool time)
+- **Speedup T/Async:** Performance ratio (Threads time / Async time)
 
 **Key Observations:**
 - **Small Workloads (1M-10M):** ThreadPool shows advantage due to reduced thread overhead
 - **Medium Workloads (50M):** ThreadPool maintains good performance with 16% speedup
 - **Large Workloads (100M):** Regular threads may perform slightly better due to better CPU utilization patterns
 - **Speedup Variance:** Ratio varies based on workload characteristics and thread management efficiency
+
+## Discussion: Pros and Cons of Each Method
+
+### 1. Atomic Sum
+**Pros:**
+- Simple to implement for parallel updates.
+- No need for explicit locks.
+- Works well for small numbers of threads.
+
+**Cons:**
+- Contention on the atomic variable can limit scalability.
+- Performance drops as thread count increases due to cache coherence traffic.
+- Memory order selection affects both correctness and speed.
+
+### 2. Reduce Sum
+**Pros:**
+- Each thread works independently, minimizing contention.
+- No atomic operations or locks during computation.
+- Good for NUMA systems and cache locality.
+
+**Cons:**
+- Requires extra memory for partial sums.
+- Final aggregation step is sequential.
+- False sharing may occur if partial sums are not properly padded.
+
+### 3. ThreadPool Sum
+**Pros:**
+- Eliminates thread creation/destruction overhead for repeated tasks.
+- Good resource management and scalability for many tasks.
+- Useful for server-like or batch workloads.
+
+**Cons:**
+- More complex implementation (thread pool management).
+- Overhead of task queue and synchronization.
+- Not always optimal for one-off tasks.
+
+### 4. Single-Threaded Sum
+**Pros:**
+- Easiest to implement and debug.
+- No synchronization or parallelism overhead.
+- Useful as a baseline for performance comparison.
+
+**Cons:**
+- No speedup from multiple cores.
+- Slowest for large datasets on multicore systems.
+
+### 5. Async Sum (std::async)
+**Pros:**
+- Very simple parallelism for divide-and-conquer algorithms.
+- Automatic thread management (handled by the standard library).
+- Futures make result collection and exception handling easy.
+- No need to manually join threads.
+
+**Cons:**
+- Less control over thread pool and scheduling.
+- Can create too many threads if not tuned (risk of oversubscription).
+- Overhead from future/promise mechanism.
+- Performance may be unpredictable depending on implementation.
 
 ## How to Compile and Run
 
